@@ -1,5 +1,7 @@
 # react-native-otp-inputs
 
+[![codecov](https://codecov.io/gh/dsznajder/react-native-otp-inputs/branch/master/graph/badge.svg)](https://codecov.io/gh/dsznajder/react-native-otp-inputs)
+
 ![npm](https://img.shields.io/npm/dw/react-native-otp-inputs.svg)
 ![npm](https://img.shields.io/npm/v/react-native-otp-inputs.svg)
 
@@ -13,44 +15,6 @@
 
 ## Installation
 
-Supported version: `react-native >= 0.59.0`
-
-### Expo is currently not supported as `Clipboard` is not included in Expo SDK
-
-```bash
-$ yarn add react-native-otp-inputs @react-native-community/clipboard
-```
-
-### After installation run:
-
-```bash
-$ npx pod-install
-```
-
-Clipboard module has been extracted from react-native core, so it needs to be installed separately.
-Package uses it for autofill feature
-
-<details>
-  <summary>For React Native version 0.59</summary>
-
-### React Native <= 0.59
-
-run the following command to link the package:
-
-```
-$ react-native link @react-native-community/clipboard
-```
-
-For iOS, make sure you install the pod file.
-
-```
-cd ios && pod install && cd ..
-```
-
-or you could follow the instructions to [manually link the project](https://reactnative.dev/docs/linking-libraries-ios#manual-linking)
-
-</details>
-
 | React-Native version | version                                |
 | -------------------- | -------------------------------------- |
 | 0.53.0 - 0.56.1      | yarn add react-native-otp-inputs@1.1.0 |
@@ -60,16 +24,16 @@ or you could follow the instructions to [manually link the project](https://reac
 ## Basic usage
 
 ```js
-import React, { Component } from 'react';
-import { View } from 'react-native';
-import OtpInputs from 'react-native-otp-inputs';
+import React, { Component } from "react";
+import { View } from "react-native";
+import OtpInputs from "react-native-otp-inputs";
 
 export default class App extends Component {
   render() {
     return (
       <View style={styles.container}>
         <OtpInputs
-          handleChange={(code) => console.log(code)}
+          handleChange={code => console.log(code)}
           numberOfInputs={6}
         />
       </View>

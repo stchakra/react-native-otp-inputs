@@ -1,4 +1,3 @@
-import Clipboard from '@react-native-community/clipboard';
 import React, {
   RefObject,
   forwardRef,
@@ -9,10 +8,10 @@ import React, {
   useRef,
 } from 'react';
 import {
+  Clipboard,
   Keyboard,
   NativeSyntheticEvent,
   Platform,
-  StyleProp,
   StyleSheet,
   TextInput,
   TextInputKeyPressEventData,
@@ -23,26 +22,85 @@ import {
 } from 'react-native';
 
 import OtpInput from './OtpInput';
-import { OtpInputsRef, SupportedKeyboardType } from './types';
+import { ActionTypes, OtpInputsRef, ReducerState, Actions } from './types';
 import { fillOtpCode } from './helpers';
-import reducer from './reducer';
-
-const supportAutofillFromClipboard =
-  Platform.OS === 'android' || parseInt(Platform.Version as string, 10) < 14;
 
 type Props = TextInputProps & {
-  autofillFromClipboard: boolean;
-  autofillListenerIntervalMS?: number;
-  keyboardType?: SupportedKeyboardType;
-  style?: StyleProp<ViewStyle>;
-  focusStyles?: StyleProp<ViewStyle>;
+  keyboardType?:
+    | 'default'
+    | 'email-address'
+    | 'phone-pad'
+    | 'visible-password'
+    | 'ascii-capable'
+    | 'numbers-and-punctuation'
+    | 'url'
+    | 'name-phone-pad'
+    | 'twitter'
+    | 'web-search'
+    | undefined;
+  style?: ViewStyle;
+  focusStyles?: ViewStyle;
   defaultValue?: string;
   handleChange: (otpCode: string) => void;
-  inputContainerStyles?: StyleProp<ViewStyle>;
-  inputStyles?: StyleProp<TextStyle>;
+  inputContainerStyles?: ViewStyle;
+  inputStyles?: TextStyle;
   isRTL?: boolean;
   numberOfInputs: number;
   testIDPrefix?: string;
+};
+
+const ACTION_TYPES: ActionTypes = {
+  setHandleChange: 'setHandleChange',
+  setOtpTextForIndex: 'setOtpTextForIndex',
+  setOtpCode: 'setOtpCode',
+  clearOtp: 'clearOtp',
+  setHasKeySupport: 'setHasKeySupport',
+};
+
+const reducer = (state: ReducerState, { type, payload }: Actions) => {
+  switch (type) {
+    case ACTION_TYPES.setOtpTextForIndex: {
+      const otpCode = {
+        ...state.otpCode,
+        [`${payload.index}`]: payload.text,
+      };
+      state.handleChange(Object.values(otpCode).join(''));
+
+      return {
+        ...state,
+        otpCode,
+      };
+    }
+
+    case ACTION_TYPES.setOtpCode: {
+      const otpCode = fillOtpCode(payload.numberOfInputs, payload.code);
+
+      state.handleChange(Object.values(otpCode).join(''));
+
+      return {
+        ...state,
+        otpCode,
+      };
+    }
+
+    case ACTION_TYPES.clearOtp: {
+      const otpCode = fillOtpCode(payload);
+      state.handleChange(Object.values(otpCode).join(''));
+
+      return { ...state, otpCode };
+    }
+
+    case ACTION_TYPES.setHandleChange: {
+      return { ...state, handleChange: payload };
+    }
+
+    case ACTION_TYPES.setHasKeySupport: {
+      return { ...state, hasKeySupport: payload };
+    }
+
+    default:
+      return state;
+  }
 };
 
 const styles = StyleSheet.create({
@@ -57,8 +115,6 @@ const styles = StyleSheet.create({
 const OtpInputs = forwardRef<OtpInputsRef, Props>(
   (
     {
-      autofillFromClipboard = supportAutofillFromClipboard,
-      autofillListenerIntervalMS = 1000,
       autoCapitalize = 'none',
       clearTextOnFocus = false,
       defaultValue,
@@ -78,8 +134,6 @@ const OtpInputs = forwardRef<OtpInputsRef, Props>(
     },
     ref,
   ) => {
-    const previousCopiedText = useRef<string>('');
-    const inputs = useRef<Array<RefObject<TextInput>>>([]);
     const [{ otpCode, hasKeySupport }, dispatch] = useReducer(
       reducer,
       {},
@@ -89,17 +143,19 @@ const OtpInputs = forwardRef<OtpInputsRef, Props>(
         hasKeySupport: Platform.OS === 'ios',
       }),
     );
+    const previousCopiedText: { current: string } = useRef('');
+    const inputs: { current: Array<RefObject<TextInput>> } = useRef([]);
 
     useEffect(() => {
-      dispatch({ type: 'setHandleChange', payload: handleChange });
+      dispatch({ type: ACTION_TYPES.setHandleChange, payload: handleChange });
     }, [handleChange]);
 
     useImperativeHandle(
       ref,
       () => ({
         reset: (): void => {
-          dispatch({ type: 'clearOtp', payload: numberOfInputs });
-          inputs.current.forEach((input) => input?.current?.clear());
+          dispatch({ type: ACTION_TYPES.clearOtp, payload: numberOfInputs });
+          inputs.current.forEach(input => input?.current?.clear());
           previousCopiedText.current = '';
           Clipboard.setString('');
         },
@@ -110,6 +166,16 @@ const OtpInputs = forwardRef<OtpInputsRef, Props>(
       }),
       [numberOfInputs],
     );
+
+    const handleTextChange = (text: string, index: number) => {
+      if (
+        (Platform.OS === 'android' && !hasKeySupport) ||
+        // Pasted from input accessory
+        (Platform.OS === 'ios' && text.length > 1)
+      ) {
+        handleInputTextChange(text, index);
+      }
+    };
 
     const handleInputTextChange = (text: string, index: number): void => {
       if (!text.length) {
@@ -124,7 +190,7 @@ const OtpInputs = forwardRef<OtpInputsRef, Props>(
 
       if (text) {
         dispatch({
-          type: 'setOtpTextForIndex',
+          type: ACTION_TYPES.setOtpTextForIndex,
           payload: {
             text,
             index,
@@ -138,16 +204,6 @@ const OtpInputs = forwardRef<OtpInputsRef, Props>(
       }
     };
 
-    const handleTextChange = (text: string, index: number) => {
-      if (
-        (Platform.OS === 'android' && !hasKeySupport) ||
-        // Pasted from input accessory
-        (Platform.OS === 'ios' && text.length > 1)
-      ) {
-        handleInputTextChange(text, index);
-      }
-    };
-
     const handleKeyPress = (
       {
         nativeEvent: { key },
@@ -157,7 +213,7 @@ const OtpInputs = forwardRef<OtpInputsRef, Props>(
       handleInputTextChange(key === 'Backspace' ? '' : key, index);
 
       if (Platform.OS === 'android' && !hasKeySupport && !isNaN(parseInt(key)))
-        dispatch({ type: 'setHasKeySupport', payload: true });
+        dispatch({ type: ACTION_TYPES.setHasKeySupport, payload: true });
     };
 
     const focusInput = useCallback(
@@ -175,7 +231,7 @@ const OtpInputs = forwardRef<OtpInputsRef, Props>(
         const input = inputs.current[inputIndex];
         input?.current?.clear();
         dispatch({
-          type: 'setOtpTextForIndex',
+          type: ACTION_TYPES.setOtpTextForIndex,
           payload: {
             index: inputIndex,
             text: '',
@@ -189,7 +245,7 @@ const OtpInputs = forwardRef<OtpInputsRef, Props>(
     const fillInputs = useCallback(
       (code: string) => {
         dispatch({
-          type: 'setOtpCode',
+          type: ACTION_TYPES.setOtpCode,
           payload: { numberOfInputs, code },
         });
       },
@@ -212,23 +268,14 @@ const OtpInputs = forwardRef<OtpInputsRef, Props>(
     }, [fillInputs, numberOfInputs, otpCode]);
 
     useEffect(() => {
-      let interval: NodeJS.Timeout;
-
-      if (autofillFromClipboard) {
-        interval = setInterval(() => {
-          listenOnCopiedText();
-        }, autofillListenerIntervalMS);
-      }
+      const interval = setInterval(() => {
+        listenOnCopiedText();
+      }, 500);
 
       return () => {
         clearInterval(interval);
       };
-    }, [
-      autofillFromClipboard,
-      autofillListenerIntervalMS,
-      listenOnCopiedText,
-      numberOfInputs,
-    ]);
+    }, [listenOnCopiedText, numberOfInputs]);
 
     const renderInputs = (): Array<JSX.Element> => {
       const iterationArray = Array<number>(numberOfInputs).fill(0);
@@ -267,6 +314,7 @@ const OtpInputs = forwardRef<OtpInputsRef, Props>(
             })}
             numberOfInputs={numberOfInputs}
             placeholder={placeholder}
+            // @ts-ignore
             ref={inputs.current[inputIndex]}
             secureTextEntry={secureTextEntry}
             selectTextOnFocus={selectTextOnFocus}

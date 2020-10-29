@@ -65,7 +65,25 @@ const OtpInput = forwardRef<TextInput, Props>(
             ios: selectTextOnFocus,
             android: true,
           })}
-          style={inputStyles}
+          style={[{
+            margin:4,
+            padding:Platform.OS === "android"?4:18,
+            borderWidth: 2,
+            borderRadius: 7,
+            borderColor: '#ddd',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0,
+            backgroundColor: '#01AEEF',
+            textAlign:'center',
+            textColor: 'black',
+            color: 'black',
+            textFontSize:25,
+            bold: true,
+            justifyContent:'space-between'
+          
+          },inputStyles
+          ]}
           textContentType={isOTPSupported ? 'oneTimeCode' : 'none'}
           underlineColorAndroid="transparent"
           {...rest}
@@ -75,4 +93,4 @@ const OtpInput = forwardRef<TextInput, Props>(
   },
 );
 
-export default React.memo(OtpInput);
+export default React.memo<Props>(OtpInput);
